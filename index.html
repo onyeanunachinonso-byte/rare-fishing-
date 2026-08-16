@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FishQuest 3D</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    overflow:hidden;
+    font-family:Arial,Helvetica,sans-serif;
+    background:#071522;
+    color:white;
+}
+#game{
+    position:fixed;
+    inset:0;
+}
+#ui{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+}
+.topbar{
+    position:absolute;
+    top:15px;
+    left:15px;
+    right:15px;
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+}
+.panel{
+    background:rgba(5,15,25,.82);
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:14px;
+    padding:12px 16px;
+    backdrop-filter:blur(8px);
+    box-shadow:0 8px 30px rgba(0,0,0,.3);
+}
+#money{
+    color:#ffd84d;
+    font-weight:bold;
+}
+#fishCount{
+    color:#72d7ff;
+    font-weight:bold;
+}
+#message{
+    position:absolute;
+    left:50%;
+    bottom:105px;
+    transform:translateX(-50%);
+    background:rgba(0,0,0,.72);
+    padding:12px 22px;
+    border-radius:30px;
+    font-size:17px;
+    text-align:center;
+    min-width:250px;
+}
+#castBtn{
+    pointer-events:auto;
+    position:absolute;
+    left:50%;
+    bottom:25px;
+    transform:translateX(-50%);
+    border:0;
+    border-radius:15px;
+    padding:16px 45px;
+    font-size:20px;
+    font-weight:bold;
+    color:white;
+    background:linear-gradient(135deg,#0b91ff,#0062cc);
+    cursor:pointer;
+    box-shadow:0 8px 25px rgba(0,120,255,.35);
+}
+#castBtn:hover{
+    transform:translateX(-50%) scale(1.05);
+}
+#castBtn:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+}
+#catchPanel{
+    pointer-events:auto;
+    display:none;
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:min(430px,90vw);
+    text-align:center;
+    padding:25px;
+    border-radius:22px;
+    background:rgba(4,14,24,.95);
+    border:2px solid rgba(255,255,255,.15);
+    box-shadow:0 20px 70px rgba(0,0,0,.6);
+}
+#fishEmoji{
+    font-size:70px;
+}
+#caughtName{
+    font-size:30px;
+    margin:5px 0;
+}
+#caughtRarity{
+    font-size:18px;
+    font-weight:bold;
+}
+#caughtValue{
+    margin:10px 0 20px;
+    color:#ffd84d;
+    font-size:20px;
+}
+.catchButtons{
+    display:flex;
+    gap:10px;
+}
+.catchButtons button{
+    flex:1;
+    padding:13px;
+    border:0;
+    border-radius:12px;
+    color:white;
+    font-weight:bold;
+    font-size:16px;
+    cursor:pointer;
+}
+#keepBtn{background:#16834b}
+#sellBtn{background:#c53b3b}
+#collection{
+    pointer-events:auto;
+    position:absolute;
+    top:85px;
+    right:15px;
+    width:300px;
+    max-height:65vh;
+    overflow:auto;
+    display:none;
+}
+#collection h2{
+    margin-top:0;
+}
+.collectionFish{
+    padding:8px;
+    margin:5px 0;
+    border-radius:8px;
+    background:rgba(255,255,255,.07);
+    display:flex;
+    justify-content:space-between;
+}
+#collectionBtn{
+    pointer-events:auto;
+    cursor:pointer;
+    position:absolute;
+    top:15px;
+    left:50%;
+    transform:translateX(-50%);
+    padding:9px 15px;
+    border:0;
+    border-radius:10px;
+    color:white;
+    background:rgba(5,15,25,.85);
+}
+.common{color:#fff}
+.uncommon{color:#63e36f}
+.rare{color:#4da6ff}
+.epic{color:#c76cff}
+.legendary{color:#ff9b35}
+.mythic{color:#ff4d72}
+.divine{color:#ffe45c;text-shadow:0 0 10px #ffbf00}
+</style>
+</head>
+
+<body>
+
+<div id="game"></div>
+
+<div id="ui">
+
+    <div class="topbar">
+        <div class="panel">
+            💰 Money: <span id="money">£0</span>
+        </div>
+
+        <div class="panel">
+            🐟 Collection: <span id="fishCount">0</span>/99
+        </div>
+    </div>
+
+    <button id="collectionBtn">📖 Collection</button>
+
+    <div id="collection" class="panel">
+        <h2>Fish Collection</h2>
+        <div id="collectionList"></div>
+    </div>
+
+    <div id="message">
+        Cast your line to start fishing!
+    </div>
+
+    <button id="castBtn">🎣 CAST LINE</button>
+
+    <div id="catchPanel">
+        <div id="fishEmoji">🐟</div>
+        <div id="caughtName">Fish</div>
+        <div id="caughtRarity">Common</div>
+        <div id="caughtValue">£10</div>
+
+        <div class="catchButtons">
+            <button id="keepBtn">📦 KEEP</button>
+            <button id="sellBtn">💰 SELL</button>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+
+/* =========================================================
+   FISH DATABASE
+========================================================= */
+
+const fish = [
+["Goldfish","Common",40],
+["Guppy","Common",38],
+["Minnow","Common",35],
+["Sardine","Common",33],
+["Anchovy","Common",32],
+["Mackerel","Common",30],
+["Herring","Common",29],
+["Bluegill","Common",28],
+["Perch","Common",27],
+["Roach","Common",26],
+["Carp","Common",25],
+["Catfish","Common",24],
+["Bass","Common",23],
+["Trout","Common",22],
+["Cod","Common",21],
+["Haddock","Common",20],
+["Flounder","Common",19],
+["Pollock","Common",18],
+["Eel","Uncommon",17],
+["Pike","Uncommon",16],
+["Salmon","Uncommon",15],
+["Tuna","Uncommon",14],
+["Snapper","Uncommon",13],
+["Grouper","Uncommon",12],
+["Barracuda","Uncommon",11],
+["Swordfish","Uncommon",10],
+["Halibut","Uncommon",9],
+["Koi","Uncommon",8.5],
+["Rainbow Trout","Uncommon",8],
+["Arctic Char","Uncommon",7.5],
+["Walleye","Uncommon",7],
+["Sturgeon","Rare",6.5],
+["Tarpon","Rare",6],
+["Marlin","Rare",5.5],
+["Sailfish","Rare",5],
+["Mahi-Mahi","Rare",4.8],
+["Redfish","Rare",4.5],
+["Bonefish","Rare",4.2],
+["Muskie","Rare",4],
+["Lake Trout","Rare",3.8],
+["Giant Trevally","Rare",3.5],
+["Angelfish","Rare",3.3],
+["Clownfish","Rare",3.1],
+["Lionfish","Rare",2.9],
+["Butterflyfish","Rare",2.7],
+["Triggerfish","Rare",2.5],
+["Parrotfish","Rare",2.3],
+["Pufferfish","Rare",2.1],
+["Seahorse","Epic",1.9],
+["Flying Fish","Epic",1.8],
+["Electric Eel","Epic",1.7],
+["Electric Ray","Epic",1.6],
+["Moray Eel","Epic",1.5],
+["Stonefish","Epic",1.4],
+["Frogfish","Epic",1.3],
+["Leafy Seadragon","Epic",1.2],
+["Oarfish","Epic",1.1],
+["Giant Grouper","Epic",1],
+["Coelacanth","Epic",0.9],
+["Arapaima","Epic",0.8],
+["Arowana","Epic",0.75],
+["Peacock Bass","Epic",0.7],
+["Giant Catfish","Epic",0.65],
+["Blue Lobster Fish","Epic",0.6],
+["Deep-Sea Anglerfish","Legendary",0.55],
+["Giant Squidfish","Legendary",0.5],
+["Vampire Squid","Legendary",0.45],
+["Goblin Shark","Legendary",0.4],
+["Frilled Shark","Legendary",0.35],
+["Megamouth Shark","Legendary",0.3],
+["Hammerhead Shark","Legendary",0.28],
+["Great White Shark","Legendary",0.25],
+["Tiger Shark","Legendary",0.22],
+["Whale Shark","Legendary",0.2],
+["Thresher Shark","Legendary",0.18],
+["Sawfish","Legendary",0.16],
+["Blue Marlin","Legendary",0.14],
+["Black Marlin","Legendary",0.12],
+["Giant Bluefin Tuna","Legendary",0.1],
+["Alligator Gar","Legendary",0.08],
+["Giant Oarfish","Mythic",0.07],
+["Deep-Sea Dragonfish","Mythic",0.06],
+["Black Swallower","Mythic",0.05],
+["Fangtooth Fish","Mythic",0.045],
+["Viperfish","Mythic",0.04],
+["Barreleye Fish","Mythic",0.035],
+["Gulper Eel","Mythic",0.03],
+["Blobfish","Mythic",0.025],
+["Pacific Sleeper Shark","Mythic",0.02],
+["Greenland Shark","Mythic",0.015],
+["Megalodon","Mythic",0.01],
+["Ancient Coelacanth","Mythic",0.008],
+["Golden Arowana","Divine",0.005],
+["Crystal Fish","Divine",0.004],
+["Golden Koi","Divine",0.003],
+["Rainbow Fish","Divine",0.002],
+["Leviathan Fish","Divine",0.001],
+["Abyssal Dragonfish","Divine",0.0008],
+["Sea King Fish","Divine",0.0005]
+];
+
+/* =========================================================
+   GAME DATA
+========================================================= */
+
+let money = 0;
+let caughtFish = null;
+let collection = {};
+
+const rarityMultiplier = {
+    Common:1,
+    Uncommon:2,
+    Rare:5,
+    Epic:12,
+    Legendary:30,
+    Mythic:100,
+    Divine:500
+};
+
+const rarityClass = {
+    Common:"common",
+    Uncommon:"uncommon",
+    Rare:"rare",
+    Epic:"epic",
+    Legendary:"legendary",
+    Mythic:"mythic",
+    Divine:"divine"
+};
+
+function fishValue(f){
+    const rarity = f[1];
+    const chance = f[2];
+
+    let base = 10;
+
+    if(rarity==="Uncommon") base=30;
+    if(rarity==="Rare") base=100;
+    if(rarity==="Epic") base=350;
+    if(rarity==="Legendary") base=1200;
+    if(rarity==="Mythic") base=5000;
+    if(rarity==="Divine") base=25000;
+
+    return Math.max(5,Math.round(base*(1+(1/chance))));
+}
+
+/* =========================================================
+   THREE.JS 3D WORLD
+========================================================= */
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x82c9ed);
+scene.fog = new THREE.Fog(0x82c9ed,40,130);
+
+const camera = new THREE.PerspectiveCamera(
+    65,
+    window.innerWidth/window.innerHeight,
+    0.1,
+    500
+);
+
+camera.position.set(9,6,12);
+
+const renderer = new THREE.WebGLRenderer({
+    antialias:true
+});
+
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+
+document.getElementById("game").appendChild(renderer.domElement);
+
+/* LIGHT */
+
+const sun = new THREE.DirectionalLight(0xffffff,2);
+sun.position.set(20,30,10);
+sun.castShadow=true;
+scene.add(sun);
+
+const ambient = new THREE.AmbientLight(0xffffff,.6);
+scene.add(ambient);
+
+/* SKY */
+
+const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(180,32,32),
+    new THREE.MeshBasicMaterial({
+        color:0x82c9ed,
+        side:THREE.BackSide
+    })
+);
+
+scene.add(sky);
+
+/* WATER */
+
+const waterGeometry = new THREE.PlaneGeometry(180,180,80,80);
+
+const waterMaterial = new THREE.MeshPhongMaterial({
+    color:0x1976a8,
+    transparent:true,
+    opacity:.85,
+    shininess:100
+});
+
+const water = new THREE.Mesh(waterGeometry,waterMaterial);
+
+water.rotation.x=-Math.PI/2;
+water.position.y=0;
+
+scene.add(water);
+
+/* ISLAND */
+
+const island = new THREE.Mesh(
+    new THREE.CylinderGeometry(13,16,2,32),
+    new THREE.MeshStandardMaterial({color:0x4e8d3a})
+);
+
+island.position.set(0,-1,0);
+scene.add(island);
+
+/* DOCK */
+
+const dockMaterial = new THREE.MeshStandardMaterial({
+    color:0x8b572a
+});
+
+const dock = new THREE.Mesh(
+    new THREE.BoxGeometry(5,.5,13),
+    dockMaterial
+);
+
+dock.position.set(0,.35,7);
+scene.add(dock);
+
+/* DOCK POSTS */
+
+for(let x=-2;x<=2;x+=2){
+    for(let z=2;z<=13;z+=3){
+        const post = new THREE.Mesh(
+            new THREE.CylinderGeometry(.12,.12,2,8),
+            dockMaterial
+        );
+
+        post.position.set(x,-.5,z);
+        scene.add(post);
+    }
+}
+
+/* =========================================================
+   HUMAN FISHERMAN
+========================================================= */
+
+const human = new THREE.Group();
+human.position.set(0,1,6);
+
+const skin = new THREE.MeshStandardMaterial({
+    color:0xc9875c
+});
+
+const shirt = new THREE.MeshStandardMaterial({
+    color:0x1976d2
+});
+
+const pants = new THREE.MeshStandardMaterial({
+    color:0x222b35
+});
+
+const shoes = new THREE.MeshStandardMaterial({
+    color:0x111111
+});
+
+/* BODY */
+
+const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1,1.5,.6),
+    shirt
+);
+
+body.position.y=1.9;
+body.castShadow=true;
+human.add(body);
+
+/* HEAD */
+
+const head = new THREE.Mesh(
+    new THREE.SphereGeometry(.48,20,20),
+    skin
+);
+
+head.position.y=3;
+head.castShadow=true;
+human.add(head);
+
+/* HAIR */
+
+const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(.5,20,20,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x24170e})
+);
+
+hair.position.y=3.12;
+human.add(hair);
+
+/* LEGS */
+
+for(let x of [-.27,.27]){
+    const leg = new THREE.Mesh(
+        new THREE.BoxGeometry(.35,1.2,.4),
+        pants
+    );
+
+    leg.position.set(x,.75,0);
+    leg.castShadow=true;
+    human.add(leg);
+
+    const shoe = new THREE.Mesh(
+        new THREE.BoxGeometry(.42,.22,.65),
+        shoes
+    );
+
+    shoe.position.set(x,.12,.1);
+    human.add(shoe);
+}
+
+/* ARMS */
+
+const arm1 = new THREE.Mesh(
+    new THREE.BoxGeometry(.28,1.2,.3),
+    skin
+);
+
+arm1.position.set(.7,2,0);
+arm1.rotation.z=-.3;
+human.add(arm1);
+
+const arm2 = new THREE.Mesh(
+    new THREE.BoxGeometry(.28,1.2,.3),
+    skin
+);
+
+arm2.position.set(-.7,2,0);
+arm2.rotation.z=.3;
+human.add(arm2);
+
+/* FISHING ROD */
+
+const rodGroup = new THREE.Group();
+
+const rod = new THREE.Mesh(
+    new THREE.CylinderGeometry(.055,.08,5,10),
+    new THREE.MeshStandardMaterial({color:0x333333})
+);
+
+rod.rotation.z=-Math.PI/3;
+rod.position.set(.8,3.1,-.5);
+
+rodGroup.add(rod);
+
+human.add(rodGroup);
+
+/* FISHING LINE */
+
+const lineMaterial = new THREE.LineBasicMaterial({
+    color:0xffffff
+});
+
+const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(1.8,4,-.5),
+    new THREE.Vector3(3,1,1)
+]);
+
+const fishingLine = new THREE.Line(
+    lineGeometry,
+    lineMaterial
+);
+
+scene.add(fishingLine);
+
+human.add(fishingLine);
+
+/* BOBBER */
+
+const bobber = new THREE.Mesh(
+    new THREE.SphereGeometry(.13,12,12),
+    new THREE.MeshStandardMaterial({color:0xff3030})
+);
+
+bobber.position.set(3,0.1,1);
+scene.add(bobber);
+
+scene.add(human);
+
+/* TREES */
+
+function createTree(x,z){
+
+    const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(.25,.35,2,8),
+        new THREE.MeshStandardMaterial({color:0x704020})
+    );
+
+    trunk.position.set(x,1,z);
+
+    scene.add(trunk);
+
+    const leaves = new THREE.Mesh(
+        new THREE.SphereGeometry(1.5,16,16),
+        new THREE.MeshStandardMaterial({color:0x217a35})
+    );
+
+    leaves.position.set(x,2.7,z);
+
+    scene.add(leaves);
+}
+
+for(let i=0;i<25;i++){
+
+    const angle=Math.random()*Math.PI*2;
+    const radius=8+Math.random()*5;
+
+    createTree(
+        Math.cos(angle)*radius,
+        Math.sin(angle)*radius
+    );
+}
+
+/* MOUNTAINS */
+
+for(let i=0;i<8;i++){
+
+    const mountain = new THREE.Mesh(
+        new THREE.ConeGeometry(8,15,5),
+        new THREE.MeshStandardMaterial({color:0x547078})
+    );
+
+    mountain.position.set(
+        (i-4)*18,
+        6,
+        -30-Math.random()*10
+    );
+
+    scene.add(mountain);
+}
+
+/* =========================================================
+   FISHING
+========================================================= */
+
+let fishing=false;
+let castTimer=0;
+
+function chooseFish(){
+
+    const total = fish.reduce((sum,f)=>sum+f[2],0);
+
+    let random=Math.random()*total;
+
+    for(const f of fish){
+
+        random-=f[2];
+
+        if(random<=0){
+            return f;
+        }
+    }
+
+    return fish[0];
+}
+
+function castLine(){
+
+    if(fishing)return;
+
+    fishing=true;
+
+    document.getElementById("castBtn").disabled=true;
+
+    document.getElementById("message").textContent=
+        "🎣 You cast the line...";
+
+    castTimer=0;
+
+    bobber.position.set(3,0.1,1);
+}
+
+function catchFish(){
+
+    caughtFish=chooseFish();
+
+    const name=caughtFish[0];
+    const rarity=caughtFish[1];
+    const value=fishValue(caughtFish);
+
+    document.getElementById("caughtName").textContent=name;
+
+    document.getElementById("caughtRarity").textContent=rarity;
+
+    document.getElementById("caughtRarity").className=
+        rarityClass[rarity];
+
+    document.getElementById("caughtValue").textContent=
+        "Sell value: £"+value.toLocaleString();
+
+    document.getElementById("catchPanel").style.display="block";
+
+    document.getElementById("message").textContent=
+        "🐟 You caught something!";
+}
+
+/* KEEP */
+
+document.getElementById("keepBtn").onclick=function(){
+
+    if(!caughtFish)return;
+
+    const name=caughtFish[0];
+
+    collection[name]=(collection[name]||0)+1;
+
+    document.getElementById("catchPanel").style.display="none";
+
+    updateCollection();
+
+    fishing=false;
+
+    document.getElementById("castBtn").disabled=false;
+
+    document.getElementById("message").textContent=
+        "📦 "+name+" was added to your collection!";
+};
+
+/* SELL */
+
+document.getElementById("sellBtn").onclick=function(){
+
+    if(!caughtFish)return;
+
+    const value=fishValue(caughtFish);
+
+    money+=value;
+
+    document.getElementById("money").textContent=
+        "£"+money.toLocaleString();
+
+    document.getElementById("catchPanel").style.display="none";
+
+    fishing=false;
+
+    document.getElementById("castBtn").disabled=false;
+
+    document.getElementById("message").textContent=
+        "💰 You sold the "+caughtFish[0]+" for £"+value.toLocaleString()+"!";
+};
+
+/* COLLECTION */
+
+function updateCollection(){
+
+    const list=document.getElementById("collectionList");
+
+    list.innerHTML="";
+
+    let count=0;
+
+    fish.forEach(f=>{
+
+        const name=f[0];
+        const rarity=f[1];
+
+        const amount=collection[name]||0;
+
+        if(amount>0){
+
+            count++;
+
+            const div=document.createElement("div");
+
+            div.className="collectionFish";
+
+            div.innerHTML=
+                `<span class="${rarityClass[rarity]}">${name}</span>
+                 <b>x${amount}</b>`;
+
+            list.appendChild(div);
+        }
+    });
+
+    document.getElementById("fishCount").textContent=
+        count+"/99";
+}
+
+/* COLLECTION BUTTON */
+
+document.getElementById("collectionBtn").onclick=function(){
+
+    const panel=document.getElementById("collection");
+
+    panel.style.display=
+        panel.style.display==="block" ? "none":"block";
+};
+
+/* CAST BUTTON */
+
+document.getElementById("castBtn").onclick=castLine;
+
+/* =========================================================
+   ANIMATION
+========================================================= */
+
+const clock=new THREE.Clock();
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    const time=clock.getElapsedTime();
+
+    /* WATER ANIMATION */
+
+    water.position.y=Math.sin(time*.8)*.04;
+
+    /* HUMAN BREATHING */
+
+    human.position.y=
+        1+Math.sin(time*2)*.015;
+
+    /* FISHING */
+
+    if(fishing){
+
+        castTimer+=0.016;
+
+        bobber.position.y=
+            .15+Math.sin(time*5)*.08;
+
+        if(castTimer>3){
+
+            catchFish();
+
+            fishing=false;
+        }
+    }
+
+    /* CAMERA */
+
+    camera.lookAt(
+        human.position.x,
+        1.5,
+        human.position.z
+    );
+
+    renderer.render(scene,camera);
+}
+
+animate();
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+window.addEventListener("resize",()=>{
+
+    camera.aspect=
+        window.innerWidth/window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+});
+
+</script>
+
+</body>
+</html>
